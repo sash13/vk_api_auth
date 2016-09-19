@@ -98,8 +98,6 @@ def auth(email, password, client_id, scope):
         urllib.request.HTTPCookieProcessor(CookieJar()),
         urllib.request.HTTPRedirectHandler())
     doc, url = auth_user(email, password, client_id, scope, opener)
-    print(parse)
-    dir(parse)
     if parse.urlparse(url).path != "/blank.html":
         # Need to give access to requested scope
         url = give_access(doc, opener)
