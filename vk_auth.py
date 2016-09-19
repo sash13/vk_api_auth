@@ -1,11 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
-import cookielib
-import urllib2
+try:
+    from http.cookiejar import CookieJar
+except ImportError:
+    from cookielib import CookieJar
+try:
+    # For Python 3.0 and later
+    from urllib.request import urlopen
+except ImportError:
+    # Fall back to Python 2's urllib2
+    from urllib2 import urlopen
 import urllib
-from urlparse import urlparse
-from HTMLParser import HTMLParser
+from urllib import parse
+from html.parser import HTMLParser
 
 class FormParser(HTMLParser):
     def __init__(self):
@@ -57,7 +65,7 @@ def auth(email, password, client_id, scope):
             )
         doc = response.read()
         parser = FormParser()
-        parser.feed(doc)
+        parser.feed(str(doc))
         parser.close()
         if not parser.form_parsed or parser.url is None or "pass" not in parser.params or \
           "email" not in parser.params:
@@ -65,7 +73,7 @@ def auth(email, password, client_id, scope):
         parser.params["email"] = email
         parser.params["pass"] = password
         if parser.method == "POST":
-            response = opener.open(parser.url, urllib.urlencode(parser.params))
+            response = opener.open(parser.url,  parse.urlencode(parser.params).encode('utf-8') )
         else:
             raise NotImplementedError("Method '%s'" % parser.method)
         return response.read(), response.geturl()
@@ -73,12 +81,12 @@ def auth(email, password, client_id, scope):
     # Permission request form
     def give_access(doc, opener):
         parser = FormParser()
-        parser.feed(doc)
+        parser.feed(str(doc))
         parser.close()
         if not parser.form_parsed or parser.url is None:
               raise RuntimeError("Something wrong")
         if parser.method == "POST":
-            response = opener.open(parser.url, urllib.urlencode(parser.params))
+            response = opener.open(parser.url, parse.urlencode(parser.params).encode('utf-8'))
         else:
             raise NotImplementedError("Method '%s'" % parser.method)
         return response.geturl()
@@ -86,17 +94,18 @@ def auth(email, password, client_id, scope):
 
     if not isinstance(scope, list):
         scope = [scope]
-    opener = urllib2.build_opener(
-        urllib2.HTTPCookieProcessor(cookielib.CookieJar()),
-        urllib2.HTTPRedirectHandler())
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(CookieJar()),
+        urllib.request.HTTPRedirectHandler())
     doc, url = auth_user(email, password, client_id, scope, opener)
-    if urlparse(url).path != "/blank.html":
+    print(parse)
+    dir(parse)
+    if parse.urlparse(url).path != "/blank.html":
         # Need to give access to requested scope
         url = give_access(doc, opener)
-    if urlparse(url).path != "/blank.html":
+    if parse.urlparse(url).path != "/blank.html":
         raise RuntimeError("Expected success here")
-    answer = dict(split_key_value(kv_pair) for kv_pair in urlparse(url).fragment.split("&"))
+    answer = dict(split_key_value(kv_pair) for kv_pair in parse.urlparse(url).fragment.split("&"))
     if "access_token" not in answer or "user_id" not in answer:
         raise RuntimeError("Missing some values in answer")
     return answer["access_token"], answer["user_id"]
-
